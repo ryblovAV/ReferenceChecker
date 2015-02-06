@@ -32,17 +32,24 @@ object ReferenceCheckerApp extends App with Logging {
 
 
   def checkReference(tables: List[Table],
-                     filterFunc: (CountWithSQL) => Boolean, printSQL: Boolean = false) = {
+                     filterFunc: (CountWithSQL) => Boolean,
+                     printSQL: Boolean = false) = {
     val checkRes: List[(Table, List[(TableKey, CountWithSQL)])] =
-      tables.sortBy(_.tableName).map((t) => (t, ReferenceChecker.checkRefs(t).filter((a: (TableKey, CountWithSQL)) => filterFunc(a._2))))
+      tables.sortBy(_.tableName).map((t) => (t, ReferenceChecker.checkRefs(t).filter((a: (_, CountWithSQL)) => filterFunc(a._2))))
 
-    checkRes.foreach((a) => printMessage(a._1, a._2, printSQL))
+    checkRes.foreach((a) =>
+      a match {
+        case (table, detailsRefs) => printMessage(table, detailsRefs, printSQL)
+        case _ => throw new Exception("error result check refs")
+      }
+    )
   }
 
   def checkBackwardReference(tables: List[Table],
+                             filterFunc: (CountWithSQL) => Boolean,
                              printSQL: Boolean = false) = {
     val checkRes: List[(Table, CountWithSQL)] =
-      tables.sortBy(_.tableName).map((t) => (t, ReferenceChecker.checkBackwardsRefs(t)))
+      tables.sortBy(_.tableName).map((t) => (t, ReferenceChecker.checkBackwardsRefs(t))).filter((a: (_, CountWithSQL)) => filterFunc(a._2))
 
     checkRes.foreach((a) => printMessage(a._1, a._2, printSQL))
   }
@@ -59,6 +66,6 @@ object ReferenceCheckerApp extends App with Logging {
   info("-----Not reference --------------------------------------")
   checkReference(createListTables,(c) => c.count > 0)
   info("-----Not reference (many Table) --------------------------------------")
-  checkBackwardReference(createBackwardListTables, false)
+  checkBackwardReference(createBackwardListTables, (c) => c.count > 0)
   info("end")
 }
