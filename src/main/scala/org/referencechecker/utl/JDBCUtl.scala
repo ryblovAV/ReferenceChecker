@@ -17,7 +17,7 @@ class JDBCUtl {
   def getTables:List[Table] = {
     val rm = new RowMapper[Table] {
       override def mapRow(rs: ResultSet, rowNum: Int): Table = {
-        Table(rs.getString(1),Option(rs.getString(2)),Nil)
+        Table(rs.getString(1),rs.getString(2),Nil)
       }
     }
     jdbcTemplate.query(SQLBuilder.sqlMaster,rm).toArray(Array[Table]()).toList

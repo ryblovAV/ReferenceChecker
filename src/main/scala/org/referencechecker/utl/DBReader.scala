@@ -10,23 +10,24 @@ object DBReader extends Logging {
   val jdbcUtl: JDBCUtl = ctx.getBean(classOf[JDBCUtl])
 
   def getDetails(m: Table) =
-    m.pKeyColumn match {
-      case Some(column) => jdbcUtl.getDetailsReferences(m.name, column)
-      case _ => Nil
-    }
+      jdbcUtl.getDetailsReferences(m.tableName, m.pKeyColumnName)
 
   def readFromDB = {
     jdbcUtl.getTables.map((m) => m.copy(detailsRefs = getDetails(m)))
   }
 
-  def checkRefs(mTable:String,mColumn:String,dTable:String,dColumn:String):(Int,String) = {
+  def checkRefs(mTable:String,mColumn:String,dTable:String,dColumn:String):CountWithSQL = {
     val sql: String = SQLBuilder.buildSQL(mTable, mColumn, dTable, dColumn)
-    (jdbcUtl.calcCount(sql),sql)
+    CountWithSQL(jdbcUtl.calcCount(sql),sql)
   }
 
   def getTablesWithCount:List[(String,Int)] = {
-    jdbcUtl.getTables.map((t:Table) => (t.name,jdbcUtl.calcCount(SQLBuilder.sqlCalcCountRow(t.name))))
+    jdbcUtl.getTables.map((t:Table) => (t.tableName,jdbcUtl.calcCount(SQLBuilder.sqlCalcCountRow(t.tableName))))
   }
 
+  def checkBackwardRefs(table: Table) = {
+    val sql: String = SQLBuilder.buildSQLBackwardCheck(table.tableName,table.pKeyColumnName,table.detailsRefs)
+    CountWithSQL(jdbcUtl.calcCount(sql),sql)
+  }
 
 }

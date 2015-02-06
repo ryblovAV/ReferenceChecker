@@ -1,7 +1,5 @@
 package org.referencechecker.models
 
-case class TableKey(table:String,column:Option[String])
+case class TableKey(tableName:String,column:Option[String])
 
-
-
-case class Table(name:String,pKeyColumn:Option[String],detailsRefs:List[TableKey])
+case class Table(tableName:String,pKeyColumnName:String,detailsRefs:List[TableKey])

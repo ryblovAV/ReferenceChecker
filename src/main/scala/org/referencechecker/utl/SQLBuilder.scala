@@ -29,6 +29,7 @@ object SQLBuilder {
         |  from all_tab_columns t2
         | where (t2.column_name like '%$columnName' or t2.column_name like '$columnName%')
         |   and t2.owner = 'STGADM'
+        |   and t2.table_name like 'CI_%'
         |   and exists (select *
         |                 from dba_dependencies t
         |                where t.owner = 'LESKDATA'
@@ -36,7 +37,18 @@ object SQLBuilder {
         |                  and t.referenced_owner = t2.owner
         |                  and t.referenced_type = 'TABLE'
         |                  and t.referenced_name = t2.table_name)
-        |                  and t2.table_name != :table_name""".stripMargin
+        |   and t2.table_name != :table_name
+        |   and not (t2.column_name != '$columnName'
+        |        and exists (select *
+        |                      from all_constraints c,
+        |                           all_cons_columns cc
+        |                     where c.constraint_name = cc.constraint_name
+        |                       and c.owner = cc.owner
+        |                       and c.owner = 'STGADM'
+        |                       and c.constraint_type = 'P'
+        |                       and cc.column_name = t2.column_name
+        |                       and c.table_name like '%_K')
+        |           )""".stripMargin
 
   def sqlCalcCountRow(tableName:String, owner:String = "STGADM") =
     s"""
@@ -50,11 +62,30 @@ object SQLBuilder {
        | where not exists (select *
        |                     from $owner.$mTable m
        |                    where m.$mColumn = d.$dColumn)
-       |   and d.$dColumn != ' '
+       |   and d.$dColumn != ' '""".stripMargin
+  }
+
+  def buildSQLExistsForTable(mColumn: String, dTables: List[TableKey], owner: String) = {
+    dTables.foldLeft(" ")((sql,tk) =>
+      s"""|$sql
+          |${if (sql != " ") "union all " else ""}
+          |select d.${tk.column.getOrElse(mColumn)}
+          |   from $owner.${tk.tableName} d
+          |  where d.${tk.column.getOrElse(mColumn)} = m.$mColumn""".stripMargin)
+  }
+
+  def buildSQLBackwardCheck(mTable: String, mColumn: String, dTables: List[TableKey], owner: String = "STGADM") = {
+    s"""
+       |select count(*)
+       |  from $owner.$mTable m
+       | where not exists (
+       |  ${buildSQLExistsForTable(mColumn, dTables, owner)}
+       |  )
      """.stripMargin
   }
 
+
   def buildSQL(master: TableKey,detail: TableKey):String =
-    buildSQL(master.table,master.column.get,detail.table,detail.column.getOrElse(master.column.get))
+    buildSQL(master.tableName,master.column.get,detail.tableName,detail.column.getOrElse(master.column.get))
 
 }
